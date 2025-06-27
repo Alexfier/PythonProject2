@@ -13,17 +13,19 @@ dependencies = [
 
 [tool.poetry.dependencies]
 python = "^3.12"
-psycopg2-binary = "^2.9.10"
-black = "^25.1.0"
-pillow = "^11.2.1"
-ipython = "^9.2.0"
-dotenv = "^0.9.9"
+django = "^5.1.2"
 psycopg2 = "^2.9.10"
-python-dotenv = "^1.1.0"
-django = "4.2.2"
-redis = "^6.1.0"
+python-dotenv = "^1.0.1"
+black = "^24.10.0"
+pillow = "^11.0.0"
+flake8 = "^7.1.1"
+ipython = "^8.29.0"
 
+
+[tool.poetry.group.lint.dependencies]
+black = "^24.10.0"
 
 [build-system]
 requires = ["poetry-core"]
 build-backend = "poetry.core.masonry.api"
+
