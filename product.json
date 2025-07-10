@@ -1,0 +1,67 @@
+[
+{
+    "model": "catalog.product",
+    "pk": 8,
+    "fields": {
+        "name": "Бутылка кефира 1.5%",
+        "description": "Бутылка кефира 1.5% для человеков",
+        "photo": "",
+        "category": 4,
+        "purchase_price": 100,
+        "created_at": "2024-11-14",
+        "updated_at": "2024-11-15"
+    }
+},
+{
+    "model": "catalog.product",
+    "pk": 10,
+    "fields": {
+        "name": "Крем-мыло",
+        "description": "Крем-мыло для человеков",
+        "photo": "",
+        "category": 6,
+        "purchase_price": 100,
+        "created_at": "2024-11-14",
+        "updated_at": "2024-11-15"
+    }
+},
+{
+    "model": "catalog.product",
+    "pk": 11,
+    "fields": {
+        "name": "Крем-мыло Пришелец",
+        "description": "Крем-мыло для инопланетян",
+        "photo": "",
+        "category": 6,
+        "purchase_price": 100,
+        "created_at": "2024-11-14",
+        "updated_at": "2024-11-15"
+    }
+},
+{
+    "model": "catalog.product",
+    "pk": 12,
+    "fields": {
+        "name": "Тридодыр",
+        "description": "Универсальное человеческое средство",
+        "photo": "",
+        "category": 7,
+        "purchase_price": 100,
+        "created_at": "2024-11-14",
+        "updated_at": "2024-11-15"
+    }
+},
+{
+    "model": "catalog.product",
+    "pk": 13,
+    "fields": {
+        "name": "Ктулху",
+        "description": "Универсальное средство для инопланетян",
+        "photo": "",
+        "category": 7,
+        "purchase_price": 100,
+        "created_at": "2024-11-14",
+        "updated_at": "2024-11-15"
+    }
+}
+]
