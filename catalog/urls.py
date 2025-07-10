@@ -1,18 +1,18 @@
 from django.urls import path
-from catalog.apps import CatalogConfig
-from catalog.views import home
-from django.conf import settings
-from django.conf.urls.static import static
-from . import views
+from .views import (
+    BlogListView,
+    BlogDetailView,
+    BlogCreateView,
+    BlogUpdateView,
+    BlogDeleteView,
+)
 
-from catalog.views import products_list, products_detail
+app_name = 'blog'
 
-app_name = CatalogConfig.name
-
-urlpatterns = ([
-                   path("", home, name="home"),
-                   path("contacts/", views.contact, name="contacts"),
-                   path('products_list', products_list, name='products_list'),
-                   path('products/<int:pk>/', products_detail, name='products_detail')
-               ]
-               + static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT))
+urlpatterns = [
+    path('', BlogListView.as_view(), name='blog_list'),
+    path('new/', BlogCreateView.as_view(), name='blog_create'),
+    path('<int:pk>/', BlogDetailView.as_view(), name='blog_detail'),
+    path('update/<int:pk>/', BlogUpdateView.as_view(), name='blog_update'),
+    path('delete/<int:pk>/', BlogDeleteView.as_view(), name='blog_delete'),
+]

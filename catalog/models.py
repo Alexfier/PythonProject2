@@ -1,58 +1,16 @@
 from django.db import models
 
+# Create your models here.
 
-class Category(models.Model):
-    name = models.CharField(
-        max_length=50,
-        verbose_name="Наименование категории",
-        help_text="Введите наименование категории",
-    )
-    description = models.TextField(
-        max_length=150, verbose_name="Описание категории", blank=True, null=True
-    )
-
-    class Meta:
-        verbose_name = "Категория"
-        verbose_name_plural = "Категории"
-        ordering = ["name"]
+class Blog(models.Model):
+    title = models.CharField(max_length=200, verbose_name='заголовок')
+    content = models.TextField(null=True, blank=True, verbose_name='содержимое')
+    preview = models.ImageField(upload_to='blog/preview',
+                                null=True, blank=True, verbose_name='изображение',
+                                help_text='Загрузите изображение')
+    created_at = models.DateTimeField(auto_now_add=True, verbose_name='дата создания')
+    is_published = models.BooleanField(default=False, verbose_name='признак публикации')
+    views_count = models.PositiveIntegerField(default=0, verbose_name='количество просмотров')
 
     def __str__(self):
-        return self.name
-
-
-class Product(models.Model):
-    name = models.CharField(
-        max_length=50,
-        verbose_name="Наименование продукта",
-        help_text="Введите наименование продукта",
-    )
-    description = models.TextField(
-        max_length=300, verbose_name="Описание продукта", blank=True, null=True
-    )
-    photo = models.ImageField(
-        upload_to="products/photo",
-        blank=True,
-        null=True,
-        verbose_name="Фото",
-    )
-    category = models.ForeignKey(
-        Category,
-        on_delete=models.SET_NULL,
-        verbose_name="Категория",
-        null=True,
-        blank=True,
-        related_name='products'
-    )
-    price = models.PositiveIntegerField()
-    created_at = models.DateTimeField(auto_now_add=True, verbose_name="Дата создания")
-    updated_at = models.DateTimeField(
-        auto_now_add=True, verbose_name="Дата последнего изменения"
-    )
-
-    class Meta:
-        verbose_name = "Продукт"
-        verbose_name_plural = "Продукты"
-        ordering = ["category", "price", "name"]
-
-    def __str__(self):
-        return self.name
+        return self.title
