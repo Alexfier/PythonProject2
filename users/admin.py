@@ -1,27 +1,16 @@
 from django.contrib import admin
 
-from users.models import CustomsUser, Payments
+from users.models import User, Payments
 
 
-@admin.register(CustomsUser)
-class CustomsUserAdmin(admin.ModelAdmin):
-    list_display = ("id", "email", "first_name", "last_name", "phone", "city", "avatar")
+# Register your models here.
+@admin.register(User)
+class UserAdmin(admin.ModelAdmin):
+    list_display = ('id', 'email', 'avatar', 'phone', 'city',)
+    list_filter = ('email', 'id')
 
 
 @admin.register(Payments)
 class PaymentsAdmin(admin.ModelAdmin):
-    list_display = (
-        "id",
-        "user",
-        "payment_date",
-        "paid_course",
-        "paid_lesson",
-        "payment_amount",
-        "payment_method",
-    )
-    search_fields = ("user",)
-    search_filter = (
-        "payment_date",
-        "paid_course",
-        "paid_lesson",
-    )
+    list_display = ('id', 'date_payment', 'paid_course', 'paid_lesson', 'amount_payment', 'method_payment', 'owner')
+    list_filter = ('id', 'paid_lesson', 'paid_course', 'date_payment',)

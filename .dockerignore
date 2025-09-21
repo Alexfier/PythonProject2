@@ -2,6 +2,6 @@
 .gitignore
 .env
 venv
-__pycache__
+--pycache--
 *.pyc
-test_db.sqlite
+test_db.sqlite3

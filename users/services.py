@@ -1,35 +1,53 @@
 import stripe
 
-from config.settings import SECRET_KEY_API
-
-stripe.api_key = SECRET_KEY_API
+from config import settings
 
 
-def creating_product_stripe(course):
-    """Создание продукта в страйпе"""
-    product = stripe.Product.create(
-        name=course.title,
-        description=course.description,
-    )
-    return product
+# from config import settings
 
 
-def creating_price_stripe(payment_amount, product_id):
-    """Создание цены в страйпе"""
-    price = stripe.Price.create(
-        currency="rub",
-        unit_amount=int(payment_amount * 100),
-        product=product_id,
-    )
-    return price
+def create_stripe_product(product):
+    """ Функция создания продукта для оплаты """
+    stripe.api_key = settings.STRIPE_API_KEY
+    # Создали продукт(курс) для оплаты
+    stripe_product = stripe.Product.create(name=product.title,
+                                           active=True,
+                                           metadata={
+                                               "description": product.description,
+                                               "owner": product.owner,
+                                               "price": product.price,
+                                           }
+                                           )
+    return stripe_product
 
 
-def creating_session_stripe(price_id):
-    """Создание сессии для получения ссылки на оплату в страйпе"""
-    session = stripe.checkout.Session.create(
-        payment_method_types=["card"],
-        line_items=[{"price": price_id, "quantity": 1}],
-        mode="payment",
-        success_url="https://127.0.0.1:8000/success?session_id={CHECKOUT_SESSION_ID}",
-    )
-    return session.id, session.url
+def modify_stripe_product(product):
+    """ Функция обновления продукта для оплаты """
+    stripe.api_key = settings.STRIPE_API_KEY
+    # Создали продукт(курс) для оплаты
+    return stripe.Product.modify(id=product.id_stripe_product,
+                                 metadata={
+                                     "description": product.description,
+                                     "owner": product.owner,
+                                     "price": product.price,
+                                 }
+                                 )
+
+
+def create_stripe_price(price: int, id_stripe_product):
+    """ Функция создания цены продукта для оплаты """
+    stripe.api_key = settings.STRIPE_API_KEY
+    # Создали цену
+    return stripe.Price.create(currency='rub',
+                               product=id_stripe_product,
+                               unit_amount=price * 100
+                               )
+
+
+def create_stripe_session(price):
+    stripe.api_key = settings.STRIPE_API_KEY
+    """ Функция, которая открывает платёжную сессию. """
+    session = stripe.checkout.Session.create(success_url="http://127.0.0.1:8000/",
+                                             line_items=[{"price": price.get("id"), "quantity": 1}],
+                                             mode='payment',)
+    return session.get("id"), session.get("url")

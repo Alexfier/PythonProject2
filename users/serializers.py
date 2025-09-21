@@ -1,15 +1,15 @@
 from rest_framework import serializers
 
-from users.models import CustomsUser, Payments
-
-
-class CustomsUserSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = CustomsUser
-        fields = "__all__"
+from users.models import Payments, User
 
 
 class PaymentsSerializer(serializers.ModelSerializer):
     class Meta:
         model = Payments
-        fields = "__all__"
+        fields = '__all__'
+
+
+class UserSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = User
+        fields = '__all__'
