@@ -1,16 +1,17 @@
-[project]
-name = "pythonproject2"
+[tool.poetry]
+name = "drf-homework"
 version = "0.1.0"
 description = ""
-authors = [
-    {name = "Alexander",email = "oldberg1999@gmail.com"}
-]
+authors = ["Vladlrnv <rodilsyaletom@mail.ru>"]
 readme = "README.md"
-requires-python = ">=3.13"
-dependencies = [
-]
+
+[tool.poetry.dependencies]
+python = "^3.12"
+dotenv = "^0.9.9"
+django = "^5.1.7"
+djangorestframework = "^3.15.2"
 
 
 [build-system]
-requires = ["poetry-core>=2.0.0,<3.0.0"]
+requires = ["poetry-core"]
 build-backend = "poetry.core.masonry.api"
