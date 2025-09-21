@@ -1,57 +1,74 @@
-from rest_framework import viewsets
-from rest_framework import generics
-from rest_framework.filters import SearchFilter, OrderingFilter
-from rest_framework.permissions import IsAuthenticated, IsAdminUser
-from users.models import Payments, User
-from users.permissions import IsOwner
-from users.serializers import PaymentsSerializer, UserSerializer
-from users.services import create_stripe_session, create_stripe_price
+from django.utils.decorators import method_decorator
+from drf_yasg.utils import swagger_auto_schema
+from rest_framework.permissions import AllowAny
+from rest_framework.viewsets import ModelViewSet
+from rest_framework_simplejwt.views import TokenObtainPairView
+
+from users.models import CustomUser
+from users.serializers import CustomUserSerializer
 
 
-class UserViewSet(viewsets.ModelViewSet):
-    serializer_class = UserSerializer
-    queryset = User.objects.all()
+@method_decorator(
+    name="retrieve",
+    decorator=swagger_auto_schema(
+        operation_description="Получение объекта :model:users.CustomUser.",
+    ),
+)
+@method_decorator(
+    name="create",
+    decorator=swagger_auto_schema(
+        operation_description="Создание объекта :model:users.CustomUser.",
+    ),
+)
+@method_decorator(
+    name="list",
+    decorator=swagger_auto_schema(
+        operation_description="Получение списка объектов :model:users.CustomUser.",
+    ),
+)
+@method_decorator(
+    name="update",
+    decorator=swagger_auto_schema(
+        operation_description="Изменение объекта :model:users.CustomUser.",
+    ),
+)
+@method_decorator(
+    name="partial_update",
+    decorator=swagger_auto_schema(
+        operation_description="Частичное изменение объекта :model:users.CustomUser.",
+    ),
+)
+@method_decorator(
+    name="destroy",
+    decorator=swagger_auto_schema(
+        operation_description="Удаление объектов :model:users.CustomUser.",
+    ),
+)
+class CustomUserViewSet(ModelViewSet):
+    queryset = CustomUser.objects.all()
+    serializer_class = CustomUserSerializer
 
-
-class PaymentsListAPIView(generics.ListAPIView):
-    queryset = Payments.objects.all()
-    serializer_class = PaymentsSerializer
-    permission_classes = [IsAdminUser | IsOwner]
-    filter_backends = [SearchFilter, OrderingFilter]
-    search_filter = ['paid_course', 'paid_lesson', 'method_payment',]
-    ordering_filter = ['date_payment',]
-
-
-class PaymentsRetrieveAPIView(generics.RetrieveAPIView):
-    serializer_class = PaymentsSerializer
-    permission_classes = [IsAdminUser | IsOwner]
-
-
-class PaymentsCreateAPIView(generics.CreateAPIView):
-    queryset = Payments.objects.all()
-    serializer_class = PaymentsSerializer
-    permission_classes = [IsAuthenticated]
+    def get_permissions(self):
+        if self.action == "create":
+            self.permission_classes = [AllowAny]
+        return super().get_permissions()
 
     def perform_create(self, serializer):
-        """ Оплата покупки через stripe """
-        payment = serializer.save(owner=self.request.user)
-        course = payment.paid_course
-        # price = payment.paid_course.price
-        # id_stripe_product = payment.paid_course.id_stripe_product
-        price = create_stripe_price(course.price, course.id_stripe_product)
-
-        session_id, payment_link = create_stripe_session(price)
-        payment.session_id = session_id
-        payment.link = payment_link
-        payment.method_payment = "Перевод"
-        payment.save()
+        user = serializer.save(is_active=True)
+        user.set_password(user.password)
+        user.save()
 
 
-class PaymentsUpdateAPIView(generics.UpdateAPIView):
-    serializer_class = PaymentsSerializer
-    permission_classes = [IsAdminUser]
+class MyTokenObtainPairView(TokenObtainPairView):
+    """Аутентификация пользователя"""
 
+    permission_classes = (AllowAny,)
 
-class PaymentsDestroyAPIView(generics.DestroyAPIView):
-    serializer_class = PaymentsSerializer
-    permission_classes = [IsAdminUser]
+    @classmethod
+    def get_token(cls, user):
+        token = super().get_token(user)
+
+        token["username"] = user.username
+        token["email"] = user.email
+
+        return token
