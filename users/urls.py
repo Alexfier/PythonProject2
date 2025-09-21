@@ -1,59 +1,35 @@
-from django.urls import path
-from rest_framework.response import Response
-from rest_framework.decorators import api_view
+from django.urls import include, path
 from rest_framework.permissions import AllowAny
-from rest_framework.routers import DefaultRouter
+from rest_framework.routers import SimpleRouter
 from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
-from users.views import (
-    UserCreateAPIView,
-    UserProfileAPIView,
-    UserDeleteAPIView,
-    UserListAPIView,
-    PaymentViewSet,
-    CoursePaymentAPIView,
-)
+
 from users.apps import UsersConfig
+from users.views import (
+    CustomsUserViewSet,
+    PaymentsViewSet,
+    UserCreateAPIView,
+    PaymentCreateAPIView,
+)
 
-app_name = UsersConfig.name  # Оставляем namespace (например, 'users')
+app_name = UsersConfig.name
 
-router = DefaultRouter()
-router.register(r"payments", PaymentViewSet)
-
-
-@api_view(["GET"])
-def payment_success(request):
-    return Response({"status": "success"})
-
+router = SimpleRouter()
+router.register(r"user", CustomsUserViewSet, basename="user")
+router.register(r"payments", PaymentsViewSet, basename="payments")
 
 urlpatterns = [
+    path("", include(router.urls)),
     path("register/", UserCreateAPIView.as_view(), name="register"),
     path(
         "login/",
         TokenObtainPairView.as_view(permission_classes=(AllowAny,)),
-        name="token_obtain_pair",
+        name="login",
     ),
     path(
-        "token/refresh",
+        "token/refresh/",
         TokenRefreshView.as_view(permission_classes=(AllowAny,)),
         name="token_refresh",
     ),
-    path("profile/<int:pk>/", UserProfileAPIView.as_view(), name="profile-detail"),
-    path("profile/", UserProfileAPIView.as_view(), name="profile-current"),
-    path("profile/delete/", UserDeleteAPIView.as_view(), name="profile-delete"),
-    path("", UserListAPIView.as_view(), name="users-list"),
-    path(
-        "courses/<int:course_id>/pay/",
-        CoursePaymentAPIView.as_view(),
-        name="course-pay",
-    ),
-    path(
-        "payment/success/", payment_success, name="payment-success"
-    ),  # Теперь обращение через users:payment-success
-    path(
-        "payment/cancel/",
-        lambda request: Response({"status": "canceled"}),
-        name="payment-cancel",
-    ),
+    path("payment/", PaymentCreateAPIView.as_view(), name="payment"),
 ]
-
 urlpatterns += router.urls

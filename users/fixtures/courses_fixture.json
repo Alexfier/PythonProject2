@@ -1,0 +1,29 @@
+[
+{
+    "model": "courses.course",
+    "pk": 1,
+    "fields": {
+        "title": "Курс кройки и шитья",
+        "description": "Учим вышивать крестиком и пришивать пуговицы к носкам",
+        "preview": ""
+    }
+},
+{
+    "model": "courses.course",
+    "pk": 2,
+    "fields": {
+        "title": "Программирование",
+        "description": "Программируем всё, от ZX Spectrum и вплоть до НЛП",
+        "preview": ""
+    }
+},
+{
+    "model": "courses.course",
+    "pk": 3,
+    "fields": {
+        "title": "Алкокурс",
+        "description": "Раздаточного материала нет, приносим с собой",
+        "preview": ""
+    }
+}
+]

@@ -1,58 +1,44 @@
-from django.contrib.auth.base_user import BaseUserManager
 from django.contrib.auth.models import AbstractUser
 from django.db import models
 
-from materials.models import Course, Lesson
+from courses.models import Course, Lesson
 
 
-# Create your models here.
-class UserManager(BaseUserManager):
-    def create_user(self, email, password=None, **extra_fields):
-        if not email:
-            raise ValueError("The Email must be set")
-        email = self.normalize_email(email)
-        user = self.model(email=email, **extra_fields)
-        user.set_password(password)
-        user.save()
-        return user
-
-    def create_superuser(self, email, password, **extra_fields):
-        extra_fields.setdefault("is_staff", True)
-        extra_fields.setdefault("is_superuser", True)
-        return self.create_user(email, password, **extra_fields)
-
-
-class User(AbstractUser):
+class CustomsUser(AbstractUser):
     username = None
     email = models.EmailField(
-        unique=True, verbose_name="Почта", help_text="Укажите почту"
+        unique=True,
+        verbose_name="Email",
+        help_text="Укажите почту",
     )
     phone = models.CharField(
         max_length=35,
+        verbose_name="телефон",
         blank=True,
         null=True,
-        verbose_name="Телефон",
-        help_text="Укажите телефон",
+        help_text="введи номер телефона",
     )
-    city = models.CharField(
-        max_length=150,
-        blank=True,
-        null=True,
-        verbose_name="Город",
-        help_text="Укажите ваш город",
+    first_name = models.CharField(
+        max_length=50,
+        verbose_name="Имя",
+    )
+    last_name = models.CharField(
+        max_length=50,
+        verbose_name="Фамилия",
     )
     avatar = models.ImageField(
-        upload_to="users/avatars",
+        upload_to="users/avatars/",
         blank=True,
         null=True,
         verbose_name="Аватар",
-        help_text="Загрузите аватар",
     )
-    is_moderator = models.BooleanField(
-        default=False,
-        verbose_name="Модератор",
+    city = models.CharField(
+        max_length=50,
+        blank=True,
+        null=True,
+        verbose_name="Город",
+        help_text="Укажите город",
     )
-    objects = UserManager()
 
     USERNAME_FIELD = "email"
     REQUIRED_FIELDS = []
@@ -61,45 +47,64 @@ class User(AbstractUser):
         verbose_name = "Пользователь"
         verbose_name_plural = "Пользователи"
 
+    def __str__(self):
+        return self.email
 
-class Payment(models.Model):
+
+class Payments(models.Model):
     PAYMENT_METHOD_CHOICES = [
-        ("cash", "Наличные"),
-        ("transfer", "Перевод на счет"),
+        ("CASH", "Наличные"),
+        ("TRANSFER", "Перевод на счёт"),
     ]
-
     user = models.ForeignKey(
-        User,
+        CustomsUser,
         on_delete=models.CASCADE,
-        verbose_name="Пользователь",
         related_name="payments",
+        verbose_name="пользователь",
     )
     payment_date = models.DateTimeField(auto_now_add=True, verbose_name="Дата оплаты")
     paid_course = models.ForeignKey(
         Course,
-        on_delete=models.SET_NULL,
         null=True,
         blank=True,
-        verbose_name="Оплаченный курс",
+        on_delete=models.CASCADE,
     )
     paid_lesson = models.ForeignKey(
         Lesson,
-        on_delete=models.SET_NULL,
         null=True,
         blank=True,
-        verbose_name="Оплаченный урок",
+        on_delete=models.CASCADE,
     )
-    amount = models.PositiveIntegerField(verbose_name="Сумма оплаты")
+    payment_amount = models.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        verbose_name="Сумма оплаты",
+    )
     payment_method = models.CharField(
-        max_length=20, choices=PAYMENT_METHOD_CHOICES, verbose_name="Способ оплаты"
+        max_length=10,
+        choices=PAYMENT_METHOD_CHOICES,
+        verbose_name="Способ оплаты",
     )
-    stripe_product_id = models.CharField(max_length=100, blank=True, null=True)
-    stripe_price_id = models.CharField(max_length=100, blank=True, null=True)
-    stripe_session_id = models.CharField(max_length=100, blank=True, null=True)
-    stripe_payment_link = models.URLField(max_length=500, blank=True, null=True)
-    is_paid = models.BooleanField(default=False, verbose_name="Оплачено")
+
+    session_id = models.CharField(
+        max_length=255,
+        null=True,
+        blank=True,
+        verbose_name="ID сессии",
+        help_text="Укажите ID сессии",
+    )
+
+    link = models.URLField(
+        max_length=400,
+        null=True,
+        blank=True,
+        verbose_name="Ссылка на оплату",
+        help_text="Укажите ссылку на оплату",
+    )
+
+    def __str__(self):
+        return f"Платёж от {self.user} за {self.paid_course if self.paid_course else self.paid_lesson}"
 
     class Meta:
-        verbose_name = "Платеж"
+        verbose_name = "Платёж"
         verbose_name_plural = "Платежи"
-        ordering = ["-payment_date"]

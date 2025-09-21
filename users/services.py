@@ -1,46 +1,35 @@
 import stripe
-from django.conf import settings
-from materials.models import Course
 
-stripe.api_key = settings.STRIPE_API_KEY
+from config.settings import SECRET_KEY_API
 
-
-def create_stripe_product(course: Course) -> str:
-    """Создает продукт в Stripe и возвращает его ID."""
-    product_data = {
-        "name": course.name,
-    }
-
-    # Добавляем описание, только если оно есть
-    if course.description:
-        product_data["description"] = course.description
-
-    product = stripe.Product.create(**product_data)
-    return product.id
+stripe.api_key = SECRET_KEY_API
 
 
-def create_stripe_price(product_id: str, amount: int) -> str:
-    """Создает цену в Stripe и возвращает ее ID."""
-    price = stripe.Price.create(
-        product=product_id,
-        unit_amount=amount * 100,  # Переводим в копейки
-        currency="rub",
+def creating_product_stripe(course):
+    """Создание продукта в страйпе"""
+    product = stripe.Product.create(
+        name=course.title,
+        description=course.description,
     )
-    return price.id
+    return product
 
 
-def create_stripe_session(price_id: str, success_url: str, cancel_url: str) -> dict:
-    """Создает сессию оплаты в Stripe и возвращает данные сессии."""
+def creating_price_stripe(payment_amount, product_id):
+    """Создание цены в страйпе"""
+    price = stripe.Price.create(
+        currency="rub",
+        unit_amount=int(payment_amount * 100),
+        product=product_id,
+    )
+    return price
+
+
+def creating_session_stripe(price_id):
+    """Создание сессии для получения ссылки на оплату в страйпе"""
     session = stripe.checkout.Session.create(
         payment_method_types=["card"],
-        line_items=[
-            {
-                "price": price_id,
-                "quantity": 1,
-            }
-        ],
+        line_items=[{"price": price_id, "quantity": 1}],
         mode="payment",
-        success_url=success_url,
-        cancel_url=cancel_url,
+        success_url="https://127.0.0.1:8000/success?session_id={CHECKOUT_SESSION_ID}",
     )
-    return {"session_id": session.id, "payment_link": session.url}
+    return session.id, session.url
