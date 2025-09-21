@@ -1,9 +1,6 @@
-name: Habit_Tracker CI
+name: Django CI
 
-on: [push, pull_request]
-
-env:
-  SECRET_KEY: ${{ secrets.DJANGO_SECRET_KEY }}
+on: [push]
 
 jobs:
   lint:
@@ -15,19 +12,30 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v4
         with:
-          python-version: '3.10'
+          python-version: '3.12'
 
-      - name: Install flake8
+      - name: Install Poetry
         run: |
-          python -m pip install --upgrade pip
-          pip install flake8
+          curl -sSL https://install.python-poetry.org | python3 -
 
-      - name: Run Flake8
-        run: flake8 .
+      - name: Configure Poetry to create virtualenvs in the project directory
+        run: |
+          poetry config virtualenvs.in-project true
+
+      - name: Install dependencies
+        run: |
+          poetry install --no-root
+
+      - name: Run flake8
+        run: |
+          poetry run flake8 .
+
 
   test:
     needs: lint
     runs-on: ubuntu-latest
+    env:
+      SECRET_KEY: ${{ secrets.SECRET_KEY }}
     steps:
       - name: Check out code
         uses: actions/checkout@v3
@@ -35,57 +43,99 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v4
         with:
-          python-version: '3.10'
+          python-version: '3.12'
 
-      - name: Cache pip dependencies
-        uses: actions/cache@v3
-        with:
-          path: ~/.cache/pip
-          key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements.txt') }}
-          restore-keys: |
-            ${{ runner.os }}-pip-
+      - name: Install Poetry
+        run: |
+          curl -sSL https://install.python-poetry.org | python3 -
+
+      - name: Configure Poetry to create virtualenvs in the project directory
+        run: |
+          poetry config virtualenvs.in-project true
 
       - name: Install dependencies
         run: |
-          python -m pip install --upgrade pip
-          pip install -r requirements.txt
-
-      - name: Run migrations
-        run: python manage.py migrate
+          poetry install --no-root   
 
       - name: Run tests
-        run: python manage.py test
+        run: |
+          poetry run python manage.py test
 
   build:
     needs: test
     runs-on: ubuntu-latest
+    env:
+      DOCKER_HUB_USERNAME: ${{ secrets.DOCKER_HUB_USERNAME }}
+      DOCKER_HUB_ACCESS_TOKEN: ${{ secrets.DOCKER_HUB_ACCESS_TOKEN }}
+
     steps:
       - name: Check out code
         uses: actions/checkout@v3
 
-      - name: Log in Docker Hub
-        run: echo "${{ secrets.DOCKER_HUB_ACCESS_TOKEN }}" | docker login -u "${{ secrets.DOCKER_HUB_USER_NAME }}" --password-stdin
-
       - name: Build Docker image
-        run: docker build -t "${{ secrets.DOCKER_HUB_USER_NAME }}/habit_tracker" .
+        run: docker build -t ${{ secrets.DOCKER_HUB_USERNAME }}/online_training:latest -f Dockerfile .
 
-      - name: Push Docker image to Docker Hub
-        run: docker push "${{ secrets.DOCKER_HUB_USER_NAME }}/habit_tracker"
+      - name: Log in Docker hub
+        run: echo "${{ secrets.DOCKER_HUB_ACCESS_TOKEN }}" | docker login -u "${{ secrets.DOCKER_HUB_USERNAME }}" --password-stdin
+
+      - name: Push Docker image in Docker hub
+        run: docker push ${{ secrets.DOCKER_HUB_USERNAME }}/online_training:latest
 
   deploy:
     needs: build
     runs-on: ubuntu-latest
+    env:
+      SECRET_KEY: ${{ secrets.SECRET_KEY }}
+      DEBUG: ${{ secrets.DEBUG }}
+      POSTGRES_DB: ${{ secrets.POSTGRES_DB }}
+      POSTGRES_USER: ${{ secrets.POSTGRES_USER }}
+      POSTGRES_PASSWORD: ${{ secrets.POSTGRES_PASSWORD }}
+      POSTGRES_HOST: ${{ secrets.POSTGRES_HOST }}
+      POSTGRES_PORT: ${{ secrets.POSTGRES_PORT }}
+      TOKEN_TG_BOT: ${{ secrets.TOKEN_TG_BOT }}
+      EMAIL_HOST: ${{ secrets.EMAIL_HOST }}
+      EMAIL_PORT: ${{ secrets.EMAIL_PORT }}
+      EMAIL_USE_TLS: ${{ secrets.EMAIL_USE_TLS }}
+      EMAIL_USE_SSL: ${{ secrets.EMAIL_USE_SSL }}
+      EMAIL_HOST_USER: ${{ secrets.EMAIL_HOST_USER }}
+      EMAIL_HOST_PASSWORD: ${{ secrets.EMAIL_HOST_PASSWORD }}
+      SSH_KEY: ${{ secrets.SSH_KEY }}
+      DOCKER_HUB_USERNAME: ${{ secrets.DOCKER_HUB_USERNAME }}
+      DOCKER_HUB_ACCESS_TOKEN: ${{ secrets.DOCKER_HUB_ACCESS_TOKEN }}
+      SSH_USER: ${{ secrets.SSH_USER }}
+      SERVER_IP: ${{ secrets.SERVER_IP }}
+      CELERY_BROKER_URL: ${{ secrets.CELERY_BROKER_URL }}
+      CELERY_RESULT_BACKEND: ${{ secrets.CELERY_RESULT_BACKEND }}
+
     steps:
-      - name: Set up SSH agent
+      - name: Set up SSH
         uses: webfactory/ssh-agent@v0.9.0
         with:
           ssh-private-key: ${{ secrets.SSH_KEY }}
 
-      - name: Deploy to server via SSH
+      - name: Deploy to server
         run: |
-          ssh -o StrictHostKeyChecking=no ${{ secrets.SSH_USER }}@${{ secrets.SERVER_IP }} << 'EOF'
-            cd habit_tracker
-            docker stop habit_tracker || true
-            docker rm habit_tracker || true
-            docker run -d --name habit_tracker --env-file $(pwd)/.env -p 80:8000 ${{ secrets.DOCKER_HUB_USER_NAME }}/habit_tracker:${{ github.sha }}
-          EOF
+          ssh -o StrictHostKeyChecking=no ${{ secrets.SSH_USER }}@${{ secrets.SERVER_IP }}  << E0F0
+          cd online_training
+          printf "SECRET_KEY=%s\n" "$SECRET_KEY" > .env
+          printf "DEBUG=%s\n" "$DEBUG" >> .env
+          printf "POSTGRES_DB=%s\n" "$POSTGRES_DB" >> .env
+          printf "POSTGRES_USER=%s\n" "$POSTGRES_USER" >> .env
+          printf "POSTGRES_PASSWORD=%s\n" "$POSTGRES_PASSWORD" >> .env
+          printf "POSTGRES_HOST=%s\n" "$POSTGRES_HOST" >> .env
+          printf "POSTGRES_PORT=%s\n" "$POSTGRES_PORT" >> .env
+          printf "TOKEN_TG_BOT=%s\n" "$TOKEN_TG_BOT" >> .env
+          printf "EMAIL_HOST=%s\n" "$EMAIL_HOST" >> .env
+          printf "EMAIL_PORT=%s\n" "$EMAIL_PORT" >> .env
+          printf "EMAIL_USE_TLS=%s\n" "$EMAIL_USE_TLS" >> .env
+          printf "EMAIL_USE_SSL=%s\n" "$EMAIL_USE_SSL" >> .env
+          printf "EMAIL_HOST_USER=%s\n" "$EMAIL_HOST_USER" >> .env
+          printf "EMAIL_HOST_PASSWORD=%s\n" "$EMAIL_HOST_PASSWORD" >> .env
+          printf "CELERY_BROKER_URL=%s\n" "$CELERY_BROKER_URL" >> .env
+          printf "CELERY_RESULT_BACKEND=%s\n" "$CELERY_RESULT_BACKEND" >> .env
+          sudo git pull
+          sudo docker stop online_training || true
+          sudo docker rm -f online_training || true
+          sudo docker compose down -v
+          sudo docker compose up -d --build
+          E0F0

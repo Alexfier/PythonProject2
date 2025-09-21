@@ -1,17 +1,16 @@
-FROM python:3.12
+FROM python:3.12-slim
 
-WORKDIR /habit_tracker
+WORKDIR /app
 
-RUN apt-get update \
-  && apt-get install -y gcc libpq-dev python3-dev \
-  && apt-get clean \
-  && rm -rf /var/lib/apt/lists/*
+RUN pip install poetry
 
-COPY requirements.txt ./
-RUN pip install --no-cache-dir -r requirements.txt
+COPY poetry.lock pyproject.toml ./
 
-COPY . .
+RUN poetry install --no-root
+
+COPY  . .
 
 EXPOSE 8000
 
-CMD ["gunicorn", "config.wsgi:application", "--bind", "0.0.0.0:8000"]
+CMD ["poetry", "run", "python", "manage.py", "runserver", "0.0.0.0:8000"]
+

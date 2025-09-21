@@ -1,21 +1,17 @@
-from rest_framework.permissions import AllowAny
-from rest_framework.routers import SimpleRouter
-from rest_framework_simplejwt.views import TokenRefreshView
-
-from users.apps import UsersConfig
-from users.views import CustomUserViewSet, MyTokenObtainPairView
 from django.urls import path
+from rest_framework.routers import DefaultRouter
+
+from .apps import UsersConfig
+from .views import PaymentsViewSet, UserTokenObtainPairView, UserTokenRefreshView, UserViewSet
+
+router = DefaultRouter()
+
+router.register("users", UserViewSet, basename="users")
+router.register("payments", PaymentsViewSet, basename="payments")
 
 app_name = UsersConfig.name
 
-router = SimpleRouter()
-router.register("users", CustomUserViewSet)
-
 urlpatterns = [
-    path("login/", MyTokenObtainPairView.as_view(), name="login"),
-    path(
-        "token/refresh/",
-        TokenRefreshView.as_view(permission_classes=(AllowAny)),
-        name="token_refresh",
-    ),
+    path("login/", UserTokenObtainPairView.as_view(), name="token_obtain_pair"),
+    path("token/refresh/", UserTokenRefreshView.as_view(), name="token_refresh"),
 ] + router.urls

@@ -1,74 +1,42 @@
-from django.utils.decorators import method_decorator
-from drf_yasg.utils import swagger_auto_schema
+from django_filters.rest_framework import DjangoFilterBackend
+from rest_framework import viewsets
+from rest_framework.filters import OrderingFilter
 from rest_framework.permissions import AllowAny
-from rest_framework.viewsets import ModelViewSet
-from rest_framework_simplejwt.views import TokenObtainPairView
+from rest_framework_simplejwt import views
 
-from users.models import CustomUser
-from users.serializers import CustomUserSerializer
+from . import services
+from .models import Payments, User
+from .serializers import PaymentsModelSerializer, UserModelSerializer
 
 
-@method_decorator(
-    name="retrieve",
-    decorator=swagger_auto_schema(
-        operation_description="Получение объекта :model:users.CustomUser.",
-    ),
-)
-@method_decorator(
-    name="create",
-    decorator=swagger_auto_schema(
-        operation_description="Создание объекта :model:users.CustomUser.",
-    ),
-)
-@method_decorator(
-    name="list",
-    decorator=swagger_auto_schema(
-        operation_description="Получение списка объектов :model:users.CustomUser.",
-    ),
-)
-@method_decorator(
-    name="update",
-    decorator=swagger_auto_schema(
-        operation_description="Изменение объекта :model:users.CustomUser.",
-    ),
-)
-@method_decorator(
-    name="partial_update",
-    decorator=swagger_auto_schema(
-        operation_description="Частичное изменение объекта :model:users.CustomUser.",
-    ),
-)
-@method_decorator(
-    name="destroy",
-    decorator=swagger_auto_schema(
-        operation_description="Удаление объектов :model:users.CustomUser.",
-    ),
-)
-class CustomUserViewSet(ModelViewSet):
-    queryset = CustomUser.objects.all()
-    serializer_class = CustomUserSerializer
-
-    def get_permissions(self):
-        if self.action == "create":
-            self.permission_classes = [AllowAny]
-        return super().get_permissions()
+class UserViewSet(viewsets.ModelViewSet):
+    serializer_class = UserModelSerializer
+    queryset = User.objects.all()
+    permission_classes = [AllowAny]
 
     def perform_create(self, serializer):
         user = serializer.save(is_active=True)
-        user.set_password(user.password)
+        user.set_password(self.request.data.get("password"))
         user.save()
 
 
-class MyTokenObtainPairView(TokenObtainPairView):
-    """Аутентификация пользователя"""
+class PaymentsViewSet(viewsets.ModelViewSet):
+    serializer_class = PaymentsModelSerializer
+    queryset = Payments.objects.all()
+    filter_backends = [OrderingFilter, DjangoFilterBackend]
+    ordering_fields = ("date_payments",)
+    filterset_fields = ("paid_lesson", "paid_course", "payment_method")
 
-    permission_classes = (AllowAny,)
+    def perform_create(self, serializer):
+        payment = serializer.save()
+        price_id = services.create_price(product=services.create_product(), amount=payment.payment_amount)
+        link = services.create_session(price_id)
+        payment.payment_link = link
 
-    @classmethod
-    def get_token(cls, user):
-        token = super().get_token(user)
 
-        token["username"] = user.username
-        token["email"] = user.email
+class UserTokenObtainPairView(views.TokenObtainPairView):
+    permission_classes = [AllowAny]
 
-        return token
+
+class UserTokenRefreshView(views.TokenRefreshView):
+    permission_classes = [AllowAny]
