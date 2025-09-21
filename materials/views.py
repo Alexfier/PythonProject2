@@ -1,96 +1,231 @@
 from django.shortcuts import get_object_or_404
-# from django.utils.decorators import method_decorator
-from drf_yasg.utils import swagger_auto_schema
-from rest_framework import viewsets
-from rest_framework.generics import CreateAPIView, DestroyAPIView, ListAPIView, RetrieveAPIView, UpdateAPIView
+from rest_framework import status
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
+from rest_framework.viewsets import ModelViewSet
+from rest_framework.generics import (
+    CreateAPIView,
+    ListAPIView,
+    RetrieveAPIView,
+    UpdateAPIView,
+    DestroyAPIView,
+)
+from materials.models import Course, Lesson, Subscription
+from materials.paginators import CoursePaginator, LessonPaginator
+from materials.serializers import (
+    CourseSerializer,
+    LessonSerializer,
+    CourseDetailSerializer,
+)
+from drf_yasg import openapi
+from users.permissions import IsModer, IsOwner
+from drf_yasg.utils import swagger_auto_schema
+from materials.tasks import send_course_update_notification
 
-from .models import Courses, Lessons, Subscription
-from .paginators import PageSizePaginator
-from .permissions import IsOwnerPermission, ModersPermission
-from .serializers import CoursesModelSerializer, LessonsModelSerializer
-from .tasks import send_mail_after_course_update
 
+# Create your views here.
+class CourseViewSet(ModelViewSet):
+    queryset = Course.objects.all()
+    serializer_class = CourseSerializer
+    pagination_class = CoursePaginator
 
-class CoursesViewSet(viewsets.ModelViewSet):
-    serializer_class = CoursesModelSerializer
-    queryset = Courses.objects.all()
-    permission_classes = [IsAuthenticated]
-    pagination_class = PageSizePaginator
+    @swagger_auto_schema(
+        operation_summary="Создание курса",
+        operation_description="Создание нового курса. Недоступно модераторам.",
+        tags=["Курсы"],
+        responses={
+            201: CourseSerializer,
+            403: "Forbidden (если пользователь — модератор)",
+        },
+    )
+    def create(self, request, *args, **kwargs):
+        return super().create(request, *args, **kwargs)
+
+    @swagger_auto_schema(
+        operation_summary="Обновление курса",
+        operation_description="Обновление курса. Доступно владельцу или модератору.",
+        tags=["Курсы"],
+    )
+    def update(self, request, *args, **kwargs):
+        return super().update(request, *args, **kwargs)
+
+    @swagger_auto_schema(
+        operation_summary="Частичное обновление курса",
+        operation_description="Частичное обновление курса. Доступно владельцу или модератору.",
+        tags=["Курсы"],
+    )
+    def partial_update(self, request, *args, **kwargs):
+        return super().partial_update(request, *args, **kwargs)
+
+    @swagger_auto_schema(
+        operation_summary="Удаление курса",
+        operation_description="Удаление курса. Доступно только владельцу (не модератору).",
+        tags=["Курсы"],
+        responses={204: "No Content", 403: "Forbidden (если пользователь — модератор)"},
+    )
+    def destroy(self, request, *args, **kwargs):
+        return super().destroy(request, *args, **kwargs)
+
+    def get_serializer_class(self):
+        if self.action == "retrieve":
+            return CourseDetailSerializer
+        return CourseSerializer
 
     def perform_create(self, serializer):
-        serializer.save(owner=self.request.user)
-        send_mail_after_course_update.delay()
+        course = serializer.save()
+        course.owner = self.request.user
+        course.save()
 
     def get_permissions(self):
         if self.action == "create":
-            self.permission_classes = (~ModersPermission,)
-        elif self.action == "list":
-            self.permission_classes = (ModersPermission | IsOwnerPermission,)
-        elif self.action in ("retrieve", "update"):
-            self.permission_classes = (ModersPermission | IsOwnerPermission,)
+            self.permission_classes = (~IsModer,)
+        elif self.action == "retrieve":
+            self.permission_classes = (IsAuthenticated,)
+        elif self.action == "update":
+            self.permission_classes = (IsModer | IsOwner,)
         elif self.action == "destroy":
-            self.permission_classes = (~ModersPermission | IsOwnerPermission,)
+            self.permission_classes = (IsOwner | ~IsModer,)
         return super().get_permissions()
 
+    def get_serializer_context(self):
+        context = super().get_serializer_context()
+        context["request"] = self.request
+        return context
 
-class LessonsCreateAPIView(CreateAPIView):
-    serializer_class = LessonsModelSerializer
-    queryset = Lessons.objects.all()
-    permission_classes = [IsAuthenticated, ~ModersPermission]
+    def perform_update(self, serializer):
+        instance = serializer.save()
+        send_course_update_notification.delay(instance.id)
+
+
+class LessonCreateApiView(CreateAPIView):
+    queryset = Lesson.objects.all()
+    serializer_class = LessonSerializer
+    permission_classes = (
+        IsAuthenticated,
+        ~IsModer,
+    )
+
+    @swagger_auto_schema(
+        operation_summary="Создание урока",
+        operation_description="Создание нового урока. Доступно только владельцам курсов (не модераторам).",
+        tags=["Уроки"],
+        responses={
+            201: LessonSerializer,
+            403: "Forbidden (если пользователь — модератор)",
+        },
+    )
+    def post(self, request, *args, **kwargs):
+        return super().post(request, *args, **kwargs)
 
     def perform_create(self, serializer):
         serializer.save(owner=self.request.user)
 
 
-class LessonsUpdateAPIView(UpdateAPIView):
-    serializer_class = LessonsModelSerializer
-    queryset = Lessons.objects.all()
-    permission_classes = [IsAuthenticated, ModersPermission | IsOwnerPermission]
+class LessonListApiView(ListAPIView):
+    queryset = Lesson.objects.all()
+    serializer_class = LessonSerializer
+    permission_classes = (IsAuthenticated,)
+    pagination_class = LessonPaginator
 
 
-class LessonsDestroyAPIView(DestroyAPIView):
-    queryset = Lessons.objects.all()
-    serializer_class = LessonsModelSerializer
-    permission_classes = [IsAuthenticated, IsOwnerPermission | ~ModersPermission]
+class LessonRetrieveApiView(RetrieveAPIView):
+    queryset = Lesson.objects.all()
+    serializer_class = LessonSerializer
+    permission_classes = (
+        IsAuthenticated,
+        IsModer | IsOwner,
+    )
+
+    @swagger_auto_schema(
+        operation_summary="Детали урока",
+        operation_description="Возвращает детали урока. Доступно владельцу или модератору.",
+        tags=["Уроки"],
+    )
+    def get(self, request, *args, **kwargs):
+        return super().get(request, *args, **kwargs)
 
 
-class LessonsRetrieveAPIView(RetrieveAPIView):
-    serializer_class = LessonsModelSerializer
-    queryset = Lessons.objects.all()
-    permission_classes = [IsAuthenticated, ModersPermission | IsOwnerPermission]
+class LessonUpdateApiView(UpdateAPIView):
+    queryset = Lesson.objects.all()
+    serializer_class = LessonSerializer
+    permission_classes = (
+        IsAuthenticated,
+        IsModer | IsOwner,
+    )
+
+    @swagger_auto_schema(
+        operation_summary="Обновление урока",
+        operation_description="Обновление урока. Доступно владельцу или модератору.",
+        tags=["Уроки"],
+    )
+    def patch(self, request, *args, **kwargs):
+        return super().patch(request, *args, **kwargs)
+
+    @swagger_auto_schema(
+        operation_summary="Полное обновление урока",
+        operation_description="Полное обновление урока. Доступно владельцу или модератору.",
+        tags=["Уроки"],
+    )
+    def put(self, request, *args, **kwargs):
+        return super().put(request, *args, **kwargs)
 
 
-class LessonsListAPIView(ListAPIView):
-    serializer_class = LessonsModelSerializer
-    queryset = Lessons.objects.all()
-    permission_classes = [IsAuthenticated, ModersPermission | IsOwnerPermission]
-    pagination_class = PageSizePaginator
+class LessonDestroyApiView(DestroyAPIView):
+    queryset = Lesson.objects.all()
+    serializer_class = LessonSerializer
+    permission_classes = (
+        IsAuthenticated,
+        IsOwner | ~IsModer,
+    )
 
-    def get_queryset(self):
-        if ModersPermission().has_permission(self.request, self):
-            return Lessons.objects.all()
-        else:
-            return Lessons.objects.filter(owner=self.request.user)
+    @swagger_auto_schema(
+        operation_summary="Удаление урока",
+        operation_description="Удаление урока. Доступно только владельцу (не модератору).",
+        tags=["Уроки"],
+        responses={204: "No Content", 403: "Forbidden (если пользователь — модератор)"},
+    )
+    def delete(self, request, *args, **kwargs):
+        return super().delete(request, *args, **kwargs)
 
 
 class SubscriptionAPIView(APIView):
-    @swagger_auto_schema(
-        operation_description='При добавлении подписки возвращает {"message":"подписка добавлена"}, '
-        'при отмене подписки возвращает {"message":"подписка удалена"}'
-    )
-    def post(self, *args, **kwargs):
-        user = self.request.user
-        course_id = self.request.data.get("course")
-        course_item = get_object_or_404(Courses, pk=course_id)
-        subs_item = Subscription.objects.filter(user=user, course=course_item)
+    permission_classes = [IsAuthenticated]
 
-        if subs_item.exists():
-            subs_item.delete()
-            message = "подписка удалена"
+    @swagger_auto_schema(
+        operation_summary="Подписка/отписка на курс",
+        operation_description="Добавляет или удаляет подписку пользователя на курс.",
+        tags=["Подписки"],
+        request_body=openapi.Schema(
+            type=openapi.TYPE_OBJECT,
+            properties={
+                "course_id": openapi.Schema(
+                    type=openapi.TYPE_INTEGER, description="ID курса"
+                )
+            },
+            required=["course_id"],
+        ),
+        responses={
+            200: openapi.Response(
+                description="Успешная операция",
+                schema=openapi.Schema(
+                    type=openapi.TYPE_OBJECT,
+                    properties={"message": openapi.Schema(type=openapi.TYPE_STRING)},
+                ),
+            ),
+            404: "Курс не найден",
+        },
+    )
+    def post(self, request, *args, **kwargs):
+        user = request.user
+        course_id = request.data.get("course_id")
+        course = get_object_or_404(Course, id=course_id)
+        subscription, created = Subscription.objects.get_or_create(
+            user=user, course=course
+        )
+        if not created:
+            subscription.delete()
+            message = "Подписка удалена"
         else:
-            Subscription.objects.create(user=user, course=course_item)
-            message = "подписка добавлена"
-        return Response({"message": message})
+            message = "Подписка добавлена"
+        return Response({"message": message}, status=status.HTTP_200_OK)

@@ -1,34 +1,31 @@
-import datetime
-from datetime import timedelta
-
-from celery import shared_task
 from django.core.mail import send_mail
+from celery import shared_task
+from config import settings
+from materials.models import Course, Subscription
+import logging
 
-from config.settings import DEFAULT_FROM_EMAIL
-from users.models import User
-
-from .models import Subscription
-
-
-@shared_task
-def send_mail_after_course_update():
-    subscriptions = Subscription.objects.all()
-    subscriptions_list = []
-    for subscription in subscriptions:
-        subscriptions_list.append(subscription.user.email)
-    send_mail(
-        "Вышел новый урок", "По курсу из Вашей подписки появился новый урок!", DEFAULT_FROM_EMAIL, subscriptions_list
-    )
+logger = logging.getLogger(__name__)
 
 
 @shared_task
-def blocking_user():
-    users = User.objects.all()
-    timeout = datetime.datetime.today().date() - timedelta(days=30)
-    for user in users:
-        if user.last_login < timeout:
-            user.is_active = False
+def send_course_update_notification(course_id):
+    try:
+        course = Course.objects.get(id=course_id)
+        subscribers_emails = Subscription.objects.filter(course=course).values_list(
+            "user__email", flat=True
+        )
 
+        if not subscribers_emails:
+            return "Нет подписчиков для рассылки"
 
-if __name__ == "__main__":
-    blocking_user()
+        send_mail(
+            subject=f"Обновление курса: {course.name}",
+            message=f"Курс '{course.name}' был обновлен",
+            from_email=settings.EMAIL_HOST_USER,
+            recipient_list=list(subscribers_emails),
+            fail_silently=False,
+        )
+        return f"Уведомления отправлены {len(subscribers_emails)} подписчикам"
+    except Exception as e:
+        logger.error(f"Ошибка: {str(e)}")
+        return f"Ошибка при отправке: {str(e)}"

@@ -1,16 +1,9 @@
+from django.core.exceptions import ValidationError
 import re
 
-from rest_framework.serializers import ValidationError
 
-
-class CorrectUrl:
-
-    def __init__(self, field):
-        self.field = field
-
-    def __call__(self, value):
-        reg = re.compile(r"^[a-zA-Z0-9\,\-\.\ ]+youtube.com")
-        tmp_val = dict(value).get(self.field)
-        if tmp_val:
-            if not bool(reg.match(tmp_val)):
-                raise ValidationError("Link is not ok")
+def validate_youtube_url(value):
+    if value:
+        pattern = r"^(https?://)?(www\.)?youtube\.com/"
+        if not re.match(pattern, value):
+            raise ValidationError("Разрешены только ссылки на youtube.com")

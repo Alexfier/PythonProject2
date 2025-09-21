@@ -1,20 +1,42 @@
 from django.urls import path
-from rest_framework.routers import DefaultRouter
-
-from . import views
-from .apps import MaterialsConfig
-
-router = DefaultRouter()
-
-router.register("courses", views.CoursesViewSet, basename="courses")
+from rest_framework.routers import SimpleRouter
+from materials.apps import MaterialsConfig
+from materials.views import (
+    CourseViewSet,
+    LessonCreateApiView,
+    LessonUpdateApiView,
+    LessonDestroyApiView,
+    LessonListApiView,
+    LessonRetrieveApiView,
+    SubscriptionAPIView,
+)
+from drf_yasg.utils import swagger_auto_schema
 
 app_name = MaterialsConfig.name
 
+router = SimpleRouter()
+router.register("", CourseViewSet)
+
+lesson_list = swagger_auto_schema(
+    method="get",
+    operation_summary="Список уроков",
+    operation_description="Возвращает paginated-список всех уроков.",
+    tags=["Уроки"],
+)(LessonListApiView.as_view())
+
 urlpatterns = [
-    path("lessons/", views.LessonsListAPIView.as_view(), name="lessons"),
-    path("lesson/create/", views.LessonsCreateAPIView.as_view(), name="lesson_create"),
-    path("lesson/<int:pk>/update/", views.LessonsUpdateAPIView.as_view(), name="lesson_update"),
-    path("lesson/<int:pk>/destroy/", views.LessonsDestroyAPIView.as_view(), name="lesson_destroy"),
-    path("lesson/<int:pk>/", views.LessonsRetrieveAPIView.as_view(), name="lesson"),
-    path("courses/subscription/", views.SubscriptionAPIView.as_view(), name="subscription"),
-] + router.urls
+    path("lessons/", lesson_list, name="lessons_list"),
+    # path("lessons/", LessonListApiView.as_view(), name="lessons_list"),
+    path("lessons/<int:pk>/", LessonRetrieveApiView.as_view(), name="lesson_retrieve"),
+    path("lessons/create/", LessonCreateApiView.as_view(), name="lesson_create"),
+    path(
+        "lessons/<int:pk>/delete/", LessonDestroyApiView.as_view(), name="lesson_delete"
+    ),
+    path(
+        "lessons/<int:pk>/update/", LessonUpdateApiView.as_view(), name="lesson_update"
+    ),
+    # path("lessons/", LessonListApiView.as_view(), name="lessons_list"),
+    path("subscriptions/", SubscriptionAPIView.as_view(), name="subscriptions"),
+]
+
+urlpatterns += router.urls

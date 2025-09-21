@@ -1,41 +1,80 @@
+from django.conf import settings
 from django.db import models
 
-from config.settings import AUTH_USER_MODEL
+from materials.validators import validate_youtube_url
 
 
-class Courses(models.Model):
-    title = models.CharField(max_length=100, verbose_name="Название курса")
-    image = models.ImageField(upload_to="preview/", blank=True, null=True, verbose_name="Предварительный просмотр")
-    description = models.TextField(blank=True, null=True, verbose_name="Описание курса")
-    owner = models.ForeignKey(
-        AUTH_USER_MODEL, on_delete=models.CASCADE, blank=True, null=True, verbose_name="Создатель курса"
+# Create your models here.
+class Course(models.Model):
+    name = models.CharField(
+        max_length=150,
+        verbose_name="Название курса",
+        help_text="Введите название курса",
     )
-    link = models.CharField(max_length=10000, blank=True, null=True, verbose_name="Ссылка на видео")
-
-    def __str__(self):
-        return self.title
+    preview = models.ImageField(
+        upload_to="materials/course/preview",
+        blank=True,
+        null=True,
+        verbose_name="Превью курса",
+        help_text="Загрузите превью курса",
+    )
+    description = models.TextField(
+        blank=True,
+        null=True,
+        verbose_name="Описание курса",
+        help_text="Введите описание курса",
+    )
+    owner = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        verbose_name="Автор курса",
+        help_text="Укажите автора курса",
+    )
+    price = models.PositiveIntegerField(default=0, verbose_name="Цена курса")
 
     class Meta:
         verbose_name = "Курс"
         verbose_name_plural = "Курсы"
 
 
-class Lessons(models.Model):
-    title = models.CharField(max_length=100, verbose_name="Название урока")
-    image = models.ImageField(
-        upload_to="preview/lessons/", blank=True, null=True, verbose_name="Предварительный просмотр"
+class Lesson(models.Model):
+    name = models.CharField(
+        max_length=150,
+        verbose_name="Название урока",
+        help_text="Введите название урока",
     )
-    description = models.TextField(blank=True, null=True, verbose_name="Описание урока")
-    link = models.CharField(max_length=10000, blank=True, null=True, verbose_name="Ссылка на видео")
-    courses = models.ForeignKey(
-        Courses, on_delete=models.CASCADE, blank=True, null=True, verbose_name="Курс", related_name="lessons"
+    description = models.TextField(
+        blank=True,
+        null=True,
+        verbose_name="Описание урока",
+        help_text="Введите описание урока",
+    )
+    preview = models.ImageField(
+        upload_to="materials/lesson/preview",
+        blank=True,
+        null=True,
+        verbose_name="Превью урока",
+        help_text="Загрузите превью урока",
+    )
+    video_link = models.URLField(
+        unique=True,
+        verbose_name="Ссылка на видео",
+        help_text="Укажите ссылку на видео",
+        validators=[validate_youtube_url],
+    )
+    course = models.ForeignKey(
+        Course, on_delete=models.CASCADE, verbose_name="Курс", help_text="Выберите курс"
     )
     owner = models.ForeignKey(
-        AUTH_USER_MODEL, on_delete=models.CASCADE, blank=True, null=True, verbose_name="Создатель урока"
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        verbose_name="Автор урока",
+        help_text="Укажите автора урока",
     )
-
-    def __str__(self):
-        return self.title
 
     class Meta:
         verbose_name = "Урок"
@@ -44,15 +83,17 @@ class Lessons(models.Model):
 
 class Subscription(models.Model):
     user = models.ForeignKey(
-        AUTH_USER_MODEL, on_delete=models.CASCADE, blank=True, null=True, verbose_name="Пользователь"
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        verbose_name="Пользователь",
+        related_name="subscriptions",
     )
     course = models.ForeignKey(
-        Courses, on_delete=models.CASCADE, blank=True, null=True, verbose_name="Курс", related_name="courses"
+        Course,
+        on_delete=models.CASCADE,
+        verbose_name="Курс",
+        related_name="subscriptions",
     )
-    subscription = models.BooleanField(default=False, verbose_name="Подписка")
-
-    def __str__(self):
-        return "Статус активной подписки"
 
     class Meta:
         verbose_name = "Подписка"

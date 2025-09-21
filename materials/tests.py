@@ -1,80 +1,110 @@
+from django.contrib.auth.models import Group
 from django.urls import reverse
 from rest_framework import status
-from rest_framework.test import APIClient, APITestCase
-
-from materials.models import Courses, Lessons
+from rest_framework.test import APITestCase
+from materials.models import Course, Lesson, Subscription
 from users.models import User
 
 
-class LessonsTest(APITestCase):
+# Create your tests here.
+class LessonCRUDTestCase(APITestCase):
     def setUp(self):
-        self.client = APIClient()
-        self.user = User.objects.create(
-            email="test-test@test.test", password="12345", is_active=True, is_staff=True, is_superuser=True
+        """Подготовка тестовых данных."""
+        # Создаем группу модераторов
+        self.moder_group = Group.objects.create(name="moders")
+
+        # Создаем пользователей с использованием email вместо username
+        self.owner = User.objects.create(email="owner1@test.com", password="testpass")
+        self.moderator = User.objects.create(
+            email="moderator1@test.com", password="testpass"
         )
-        self.client.force_authenticate(user=self.user)
-
-        self.courses = Courses.objects.create(title="Курс", description="Описание курса", owner=self.user)
-
-        self.lessons = Lessons.objects.create(
-            title="Урок", description="Описание урока", courses=self.courses, owner=self.user
+        self.moderator.groups.add(self.moder_group)
+        self.other_user = User.objects.create(
+            email="other1@test.com", password="testpass"
         )
 
-    def test_lessons_retrieve(self):
-        url = reverse("materials:lesson", args=(self.lessons.pk,))
-        response = self.client.get(url)
-        data = response.json()
-        self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertEqual(data.get("title"), self.lessons.title)
+        # Остальной код остается без изменений
+        self.course = Course.objects.create(name="Test Course", owner=self.owner)
+        self.lesson = Lesson.objects.create(
+            name="Test Lesson",
+            course=self.course,
+            video_link="https://youtube.com/test",
+            owner=self.owner,
+        )
 
-    def test_lessons_list(self):
-        url = reverse("materials:lessons")
-        response = self.client.get(url)
-        data = response.json()
-        self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertEqual(data.get("count"), 1)
+        self.lesson_list_url = reverse("materials:lessons_list")
+        self.lesson_detail_url = reverse(
+            "materials:lesson_retrieve", kwargs={"pk": self.lesson.pk}
+        )
 
-    def test_lessons_create(self):
-        url = reverse("materials:lesson_create")
-
-        data = {"title": "Урок2", "description": "Описание урока"}
-        response = self.client.post(url, data)
+    def test_lesson_create_by_owner(self):
+        """Создание урока владельцем курса."""
+        self.client.force_authenticate(user=self.owner)
+        data = {
+            "name": "New Lesson",
+            "course": self.course.pk,
+            "video_link": "https://youtube.com/new",
+        }
+        response = self.client.post(reverse("materials:lesson_create"), data=data)
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
-        self.assertEqual(data.get("title"), "Урок2")
+        self.assertEqual(Lesson.objects.count(), 2)
 
-    def test_lessons_update(self):
-        url = reverse("materials:lesson_update", args=(self.lessons.pk,))
-        data = {"title": "Урок3"}
-        response = self.client.patch(url, data)
-        self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertEqual(data.get("title"), "Урок3")
+    def test_lesson_create_by_moderator_denied(self):
+        """Запрет создания урока модератором."""
+        self.client.force_authenticate(user=self.moderator)
+        data = {
+            "name": "New Lesson",
+            "course": self.course.pk,
+            "video_link": "https://youtube.com/new",
+        }
+        response = self.client.post(reverse("materials:lesson_create"), data=data)
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
 
-    def test_lessons_delete(self):
-        url = reverse("materials:lesson_destroy", args=(self.lessons.pk,))
-        response = self.client.delete(url)
-        self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
-        self.assertEqual(Lessons.objects.all().count(), 0)
-
-
-class SubscriptionTest(APITestCase):
-    def setUp(self):
-        self.client = APIClient()
-        self.user = User.objects.create(
-            email="test-test@test.test", password="12345", is_active=True, is_staff=True, is_superuser=True
+    def test_lesson_update_by_owner(self):
+        """Обновление урока владельцем."""
+        self.client.force_authenticate(user=self.owner)
+        data = {"name": "Updated Lesson"}
+        response = self.client.patch(
+            reverse("materials:lesson_update", kwargs={"pk": self.lesson.pk}), data=data
         )
-        self.client.force_authenticate(user=self.user)
-
-        self.courses = Courses.objects.create(title="Курс", description="Описание курса", owner=self.user)
-
-    def test_create(self):
-        url = reverse("materials:subscription")
-        # url_del = reverse("materials:subscription", args=(1,))
-        data = {"user": self.user.pk, "course": self.courses.pk}
-        response = self.client.post(url, data)
-
         self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertEqual(response.data, {"message": "подписка добавлена"})
-        response_del = self.client.post(url, data)
+        self.lesson.refresh_from_db()
+        self.assertEqual(self.lesson.name, "Updated Lesson")
 
-        self.assertEqual(response_del.status_code, status.HTTP_200_OK)
-        self.assertEqual(response_del.data, {"message": "подписка удалена"})
+    def test_lesson_delete_by_other_user_denied(self):
+        """Запрет удаления урока другим пользователем."""
+        self.client.force_authenticate(user=self.other_user)
+        response = self.client.delete(
+            reverse("materials:lesson_delete", kwargs={"pk": self.lesson.pk})
+        )
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+
+class SubscriptionTestCase(APITestCase):
+    def setUp(self):
+        """Подготовка тестовых данных для подписок."""
+        self.user = User.objects.create(email="user@test.com", password="testpass")
+        self.course = Course.objects.create(name="Test Course")
+        self.subscription_url = reverse("materials:subscriptions")
+
+    def test_subscription_create_and_delete(self):
+        """Тест создания и удаления подписки."""
+        self.client.force_authenticate(user=self.user)
+        # Создание подписки
+        response = self.client.post(
+            self.subscription_url, data={"course_id": self.course.pk}
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["message"], "Подписка добавлена")
+        self.assertTrue(
+            Subscription.objects.filter(user=self.user, course=self.course).exists()
+        )
+
+        # Удаление подписки
+        response = self.client.post(
+            self.subscription_url, data={"course_id": self.course.pk}
+        )
+        self.assertEqual(response.data["message"], "Подписка удалена")
+        self.assertFalse(
+            Subscription.objects.filter(user=self.user, course=self.course).exists()
+        )
